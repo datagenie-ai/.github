@@ -38,9 +38,9 @@ inputs:
     required: false
     description: SSH host config for accessing private repos
 
-  github-token:
+  dg-artifacts-pat:
     required: true
-    description: GitHub token to upload to dg-artifacts repo
+    description: DG Artifacts PAT to upload to dg-artifacts repo
 
 runs:
   using: "composite"
@@ -69,7 +69,7 @@ runs:
     - name: Release to DG Artifacts
       shell: bash
       run: |
-        git clone https://${{ inputs.github-token }}@github.com/datagenie-ai/dg-artifacts.git
+        git clone https://${{ inputs.dg-artifacts-pat }}@github.com/datagenie-ai/dg-artifacts.git
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         PKG_INFO=$(poetry version)
