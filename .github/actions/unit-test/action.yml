@@ -1,0 +1,59 @@
+name: Unit Test
+description: Run unit tests and code quality checks
+
+inputs:
+  python-version:
+    required: false
+    description: Python version to use
+    default: "3.12"
+
+  poetry-no-root:
+    required: false
+    description: Whether to install poetry without root
+    default: "true"
+
+  poetry-groups:
+    required: false
+    description: Array of poetry groups to install
+    default: "dev"
+
+  private-repo-access:
+    required: false
+    description: Whether to access private repositories
+    default: "true"
+
+  repo-ssh-key:
+    required: false
+    description: SSH private key for accessing private repos
+
+  repo-host-config:
+    required: false
+    description: SSH host config for accessing private repos
+
+runs:
+  using: "composite"
+  steps:
+    - name: Base Setup
+      uses: datagenie-ai/.github/.github/actions/setup-base@main
+      with:
+        python-version: ${{ inputs.python-version }}
+        poetry-no-root: ${{ inputs.poetry-no-root }}
+        poetry-groups: ${{ inputs.poetry-groups }}
+        private-repo-access: ${{ inputs.private-repo-access }}
+        repo-ssh-key: ${{ inputs.repo-ssh-key }}
+        repo-host-config: ${{ inputs.repo-host-config }}
+
+    - name: Run Ruff Lint
+      uses: astral-sh/ruff-action@v3
+
+    - name: Run Ruff Format Check
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "format --check"
+
+    - name: Run Unit Tests
+      shell: bash
+      run: |
+        poetry run coverage run -m pytest tests/unit --junitxml=report.xml
+        poetry run coverage report
+        poetry run coverage html

@@ -1,0 +1,85 @@
+name: Build Wheel and Release
+description: Build wheel and release to DG Artifacts
+
+inputs:
+  module:
+    required: true
+    description: Module to build wheel for
+
+  target_folders:
+    required: true
+    description: Array of target folders in dg-artifacts
+
+  python-version:
+    required: false
+    description: Python version to use
+    default: "3.12"
+
+  poetry-no-root:
+    required: false
+    description: Whether to install poetry without root
+    default: "true"
+
+  poetry-groups:
+    required: false
+    description: Array of poetry groups to install
+    default: "dev, build"
+
+  private-repo-access:
+    required: false
+    description: Whether to access private repositories
+    default: "true"
+
+  repo-ssh-key:
+    required: false
+    description: SSH private key for accessing private repos
+
+  repo-host-config:
+    required: false
+    description: SSH host config for accessing private repos
+
+  github-token:
+    required: true
+    description: GitHub token to upload to dg-artifacts repo
+
+runs:
+  using: "composite"
+  steps:
+    - name: Base Setup
+      uses: datagenie-ai/.github/.github/actions/setup-base@main
+      with:
+        python-version: ${{ inputs.python-version }}
+        poetry-no-root: ${{ inputs.poetry-no-root }}
+        poetry-groups: ${{ inputs.poetry-groups }}
+        private-repo-access: ${{ inputs.private-repo-access }}
+        repo-ssh-key: ${{ inputs.repo-ssh-key }}
+        repo-host-config: ${{ inputs.repo-host-config }}
+
+    - name: Build Obfuscated Wheel
+      shell: bash
+      run: |
+        poetry run codeenigma obfuscate ${{ inputs.module }}/
+        cp job_runner.py cedist/job_runner.py
+        cd cedist
+        PKG_INFO=$(poetry version)
+        VERSION=$(echo $PKG_INFO | awk '{print $2}')
+        zip -r $VERSION.zip *.whl job_runner.py
+        cd ..
+
+    - name: Release to DG Artifacts
+      shell: bash
+      run: |
+        git clone https://${{ inputs.github-token }}@github.com/datagenie-ai/dg-artifacts.git
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        PKG_INFO=$(poetry version)
+        VERSION=$(echo $PKG_INFO | awk '{print $2}')
+        cd dg-artifacts
+        
+        IFS=',' read -ra folders <<< "${{ inputs.target_folders }}"
+        for folder in "${folders[@]}"; do
+          cp ../cedist/*.zip ../cedist/job_runner.py $folder/
+          git add .
+          git commit -m "release: $folder $VERSION"
+        done
+        git push

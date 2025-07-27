@@ -1,0 +1,83 @@
+name: Setup Base
+description: Common setup logic for setting up python environment
+inputs:
+  python-version:
+    required: true
+    description: Python version to use
+    default: "3.12"
+
+  poetry-no-root:
+    required: false
+    description: Whether to install poetry without root
+    default: "true"
+
+  poetry-groups:
+    required: false
+    description: Array of poetry groups to install
+    default: "dev"
+
+  private-repo-access:
+    required: false
+    description: Whether to access private repositories
+    default: "true"
+
+  repo-ssh-key:
+    required: false
+    description: SSH private key for accessing private repos
+
+  repo-host-config:
+    required: false
+    description: SSH host config for accessing private repos
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y gcc g++
+
+    - name: Setup SSH to access private repos
+      if: ${{ inputs.private-repo-access }}
+      shell: bash
+      run: |
+        echo "Setting up SSH to access private repos"
+        mkdir ~/.ssh
+        echo ${{ inputs.repo-ssh-key }} | base64 --decode > ~/.ssh/id_ed25519
+        chmod 400 ~/.ssh/id_ed25519
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_ed25519
+        echo ${{ inputs.repo-host-config }} | base64 --decode > ~/.ssh/config
+
+    - name: Install Python dependencies
+      shell: bash
+      run: |
+        python --version
+
+        install_args=""
+
+        if [[ "${{ inputs.poetry-no-root }}" == "true" ]]; then
+          install_args="$install_args --no-root"
+        fi
+
+        if [[ -n "${{ inputs.poetry-groups }}" ]]; then
+          IFS=',' read -ra arr <<< "${{ inputs.poetry-groups }}"
+          for g in "${arr[@]}"; do
+            install_args="$install_args --with $g"
+          done
+        fi
+
+        poetry install $install_args
