@@ -8,48 +8,51 @@ inputs:
 
   tag:
     required: false
-    description: Tag to use for the docker image. If not provided will pick version from pyproject.toml
-    default: 'from-pyproject'
+    description: Tag to use for the docker image. If not provided will pick version from pyproject.toml (provide path to pyproject.toml)
+    default: 'pyproject.toml'
 
   context:
     required: false
     description: Context to use for the docker build
     default: '.'
 
-  private-repo-access:
-    required: false
-    description: Whether to access private repositories
-    default: "true"
-
-  repo-ssh-key:
-    required: false
-    description: SSH private key for accessing private repos
-
-  script-to-add-private-pkgs:
-    required: false
-    description: Script to add private packages
-
-  run-docker-scout:
-    required: false
-    description: Whether to run docker scout
-    default: "true"
-
   build-args:
     required: false
     description: Optional build arguments to pass to Docker build
     default: ""
 
-  github-token:
-    required: true
-    description: GitHub token to comment on PR
+  # ssh
+  ssh-key:
+    required: false
+    description: SSH private key for accessing private repos
 
-  docker-user:
+  # ghcr.io registry
+  registry-username:
     required: true
     description: Docker username to push/pull from ghcr.io/datagenie-ai/
 
-  docker-password:
+  registry-password:
     required: true
     description: Docker password to push/pull from ghcr.io/datagenie-ai/
+
+  # docker scout
+  run-docker-scout:
+    required: false
+    description: Whether to run docker scout, then dockerhub username and password are required
+    default: "true"
+
+  dockerhub-user:
+    required: false
+    description: DockerHub user for the running Docker Scout
+
+  dockerhub-password:
+    required: false
+    description: DockerHub password for the running Docker Scout
+
+  # github token for writing comments
+  github-token:
+    required: false
+    description: GitHub token for writing comments
 
 
 runs:
@@ -58,40 +61,53 @@ runs:
     - name: Check out code
       uses: actions/checkout@v4
 
+    - name: Setup SSH agent
+      uses: datagenie-ai/.github/.github/actions/setup-ssh-agent@main
+      with:
+        ssh-key: ${{ inputs.ssh-key }}
+
     - name: Set Container version
       shell: bash
       run: |
-        if [[ "${{ inputs.tag }}" == "from-pyproject" ]]; then
-          version=$(head -n 5 pyproject.toml | grep 'version' | cut -d'=' -f2 | sed "s/[, \"]//g")
+        if [[ "${{ inputs.tag }}" == *pyproject.toml* ]]; then
+          version=$(head -n 5 ${{ inputs.tag }} | grep 'version' | cut -d'=' -f2 | sed "s/[, \"]//g")
           echo "image_version=$version" >> $GITHUB_ENV
+          echo "Container version set from pyproject: $version"
         else
           echo "image_version=${{ inputs.tag }}" >> $GITHUB_ENV
+          echo "Container version set from input tag: ${{ inputs.tag }}"
         fi
-        echo "image_version=${{ env.image_version }}"
 
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
-        username: ${{ inputs.docker-user }}
-        password: ${{ inputs.docker-password }}
-
-    - name: Setup SSH to access private repos
-      if: ${{ inputs.private-repo-access }}
-      shell: bash
-      run: |
-        echo ${{ inputs.script-to-add-private-pkgs }} | base64 --decode > add-key.sh
-        echo ${{ inputs.repo-ssh-key }} | base64 --decode > id_ed25519
-        chmod 400 id_ed25519
-        export SSH_AUTH_SOCK=/tmp/ssh_agent.sock
-        ssh-agent -a "$SSH_AUTH_SOCK" > /dev/null
-        echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
-        ssh-add id_ed25519
+        username: ${{ inputs.registry-username }}
+        password: ${{ inputs.registry-password }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    # add ssh key for accessing private repos
+    - name: Build and push Docker image (with SSH)
+      if: inputs.ssh-key != ''
+      id: build-and-push-with-ssh
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        push: true
+        build-args: |
+          ${{ inputs.build-args }}
+        tags: ghcr.io/datagenie-ai/${{ inputs.image-name }}:${{ env.image_version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        ssh: |
+          default=${{ env.SSH_AUTH_SOCK }}
+        sbom: true
+
+    # no access to private repos
     - name: Build and push Docker image
+      if: inputs.ssh-key == ''
       id: build-and-push
       uses: docker/build-push-action@v6
       with:
@@ -102,17 +118,15 @@ runs:
         tags: ghcr.io/datagenie-ai/${{ inputs.image-name }}:${{ env.image_version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        ssh: default
         sbom: true
-        
 
     - name: Docker Scout
-      if: ${{ inputs.run-docker-scout }}
+      if: ${{ inputs.run-docker-scout }} && ${{ inputs.dockerhub-user }} && ${{ inputs.dockerhub-password }}
       id: docker-scout
       uses: docker/scout-action@v1
       with:
-        dockerhub-user: ${{ inputs.docker-user }}
-        dockerhub-password: ${{ inputs.docker-password }}
+        dockerhub-user: ${{ inputs.dockerhub-user }}
+        dockerhub-password: ${{ inputs.dockerhub-password }}
         command: quickview,cves,recommendations
         image: ghcr.io/datagenie-ai/${{ inputs.image-name }}:${{ env.image_version }}
         ignore-unchanged: false

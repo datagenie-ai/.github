@@ -1,0 +1,30 @@
+name: Setup SSH Agent
+description: Setup SSH to access private repos
+
+inputs:
+  ssh-key:
+    required: false
+    description: SSH private key for accessing private repos
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup SSH to access private repos
+      shell: bash
+      run: |
+        mkdir ~/.ssh
+        echo ${{ inputs.ssh-key }} | base64 --decode > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Start SSH agent and add key
+      shell: bash
+      run: |
+          export SSH_AUTH_SOCK=/tmp/ssh-agent.sock
+          ssh-agent -a "$SSH_AUTH_SOCK" > /dev/null
+          ssh-add ~/.ssh/id_ed25519
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+
+    - name: Confirm SSH access
+      shell: bash
+      run: ssh -T git@github.com || true
