@@ -21,6 +21,11 @@ inputs:
     description: Optional build arguments to pass to Docker build
     default: ""
 
+  no-cache:
+    required: false
+    description: Disable Docker build cache
+    default: "false"
+
   # ssh
   ssh-key:
     required: false
@@ -88,10 +93,23 @@ runs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    # add ssh key for accessing private repos
-    - name: Build and push Docker image (with SSH)
-      if: inputs.ssh-key != ''
-      id: build-and-push-with-ssh
+    # Build and push (with SSH)
+    - name: Build and push Docker image (with SSH, no-cache)
+      if: inputs.ssh-key != '' && inputs.no-cache == 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        push: true
+        no-cache: true
+        build-args: |
+          ${{ inputs.build-args }}
+        tags: ghcr.io/datagenie-ai/${{ inputs.image-name }}:${{ env.image_version }}
+        ssh: |
+          default=${{ env.SSH_AUTH_SOCK }}
+        sbom: true
+
+    - name: Build and push Docker image (with SSH, cached)
+      if: inputs.ssh-key != '' && inputs.no-cache != 'true'
       uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
@@ -105,10 +123,21 @@ runs:
           default=${{ env.SSH_AUTH_SOCK }}
         sbom: true
 
-    # no access to private repos
-    - name: Build and push Docker image
-      if: inputs.ssh-key == ''
-      id: build-and-push
+    # Build and push (no SSH)
+    - name: Build and push Docker image (no SSH, no-cache)
+      if: inputs.ssh-key == '' && inputs.no-cache == 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        push: true
+        no-cache: true
+        build-args: |
+          ${{ inputs.build-args }}
+        tags: ghcr.io/datagenie-ai/${{ inputs.image-name }}:${{ env.image_version }}
+        sbom: true
+
+    - name: Build and push Docker image (no SSH, cached)
+      if: inputs.ssh-key == '' && inputs.no-cache != 'true'
       uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
