@@ -44,10 +44,10 @@ runs:
         repo-host-config: ${{ inputs.repo-host-config }}
 
     - name: Run Ruff Lint
-      uses: astral-sh/ruff-action@v3
+      uses: astral-sh/ruff-action@v4
 
     - name: Run Ruff Format Check
-      uses: astral-sh/ruff-action@v3
+      uses: astral-sh/ruff-action@v4
       with:
         args: "format --check"
 
