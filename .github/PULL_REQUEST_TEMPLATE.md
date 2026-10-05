@@ -1,11 +1,12 @@
 ## Type of Change
-- [ ] 🔥 Has Breaking changes
-- [ ] 🎉 New features/enhancements
-- [ ] 🐛 Bug fixes
-- [ ] 📝 Documentation update
+- [ ] 🔥 Has Breaking Changes
+- [ ] 🎉 New Features/Enhancements
+- [ ] 🐛 Bug Fixes
+- [ ] 📝 Documentation Update
 - [ ] ♻️ Refactoring
 - [ ] 🛠️ Tests
-- [ ] 👷🏽 CICD
+- [ ] 👷🏽 CI/CD
+- [ ] 💀 Vulnerability Fixes
 
 ## 🎉 Enhancements
 ### <Add the new stuff you have added>
