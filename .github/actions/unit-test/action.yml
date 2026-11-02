@@ -30,6 +30,11 @@ inputs:
     required: false
     description: SSH host config for accessing private repos
 
+  java-version:
+    required: false
+    description: Java version for Spark tests (Spark 3.5 supports 8/11/17); empty string skips Java setup
+    default: "17"
+
 runs:
   using: "composite"
   steps:
@@ -42,6 +47,15 @@ runs:
         private-repo-access: ${{ inputs.private-repo-access }}
         repo-ssh-key: ${{ inputs.repo-ssh-key }}
         repo-host-config: ${{ inputs.repo-host-config }}
+
+    # Pin Java so the runner image's default JDK cannot break Spark tests
+    # (ubuntu-26.04 ships a JDK where Spark 3.5 fails with "getSubject is not supported").
+    - name: Setup Java
+      if: ${{ inputs.java-version != '' }}
+      uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
 
     - name: Run Ruff Lint
       uses: astral-sh/ruff-action@v4.0.0
