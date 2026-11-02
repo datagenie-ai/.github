@@ -31,10 +31,12 @@ A composite action that sets up the base Python environment for workflows.
 Runs unit tests and code quality checks for Python projects.
 
 **Inputs:**
-No additional inputs required. Only inherits inputs from `setup-base`
+Inherits inputs from `setup-base`, plus:
+- `java-version`: Java (Temurin) installed for Spark tests (default: "17"; Spark 3.5 supports 8/11/17). Pass `""` to skip.
 
 **Features:**
 - Inherits all functionality from `setup-base`
+- Installs a pinned Java so the runner image's default JDK cannot break Spark tests
 - Runs Ruff linter
 - Performs Ruff format checking
 - Executes unit tests with pytest
